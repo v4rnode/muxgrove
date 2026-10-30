@@ -1,0 +1,7 @@
+#!/bin/sh
+# Refuses a commit that would add work-related or personal content (see CLAUDE.md).
+root=$(git rev-parse --show-toplevel)
+if ! sh "$root/dev/leak-check.sh"; then
+  echo "Commit blocked. Replace it with a neutral placeholder or move it to a git-ignored *.local file."
+  exit 1
+fi

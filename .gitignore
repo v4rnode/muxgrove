@@ -1,0 +1,5 @@
+.DS_Store
+# Private, per-machine settings (never commit)
+profiles.local
+*.local
+.env
