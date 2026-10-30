@@ -12,7 +12,7 @@ bad() { echo "FAIL $1"; fail=1; }
 sh -n "$root/setup.sh" && ok "setup.sh syntax" || bad "setup.sh syntax"
 sh "$root/dev/extract.sh" "$t/files"
 
-for f in cw cw-doctor cc-bell.sh status.sh session-picker.sh; do
+for f in cw cw-doctor cc-bell.sh status.sh session-picker.sh cc-statusline.sh; do
   if [ -s "$t/files/$f" ]; then sh -n "$t/files/$f" && ok "$f syntax" || bad "$f syntax"; else bad "$f was not extracted"; fi
 done
 for f in ticket_eof pr_eof pr_comments_eof; do

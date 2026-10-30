@@ -60,7 +60,7 @@ Embedded files and where they are installed:
 | Heredoc | Installed to |
 |---|---|
 | `TMUX_CONF_EOF` | `~/.tmux.conf` |
-| `CC_BELL_EOF`, `STATUS_EOF`, `PICKER_EOF` | `~/.config/tmux/` |
+| `CC_BELL_EOF`, `STATUS_EOF`, `STATUSLINE_EOF`, `PICKER_EOF` | `~/.config/tmux/` |
 | `CW_EOF`, `CW_DOCTOR_EOF` | `~/.local/bin/cw`, `~/.local/bin/cw-doctor` |
 | `TICKET_EOF`, `PR_EOF`, `PR_COMMENTS_EOF` | `<each profile dir>/commands/{ticket,pr,pr-comments}.md` |
 | `ZSHRC_EOF` | managed block in `~/.zshrc` |
@@ -121,6 +121,9 @@ TMUX_TMPDIR=$t CW_NO_PLUGINS=1 CW_NO_NOTIFY=1 tmux -f tmux.conf new-session -d -
   `cwd`, `sessionId`; user lines have `message.content` as a string or an array). The format is Claude's,
   not a public API, so keep the parser tolerant (`jq -R` + `fromjson?`, skip unknown shapes) and match both
   the physical path from git and the path as typed (symlinks such as `/tmp` vs `/private/tmp`).
+- **`rate_limits` in the status-line input** (`cc-statusline.sh`) is Claude's own format, not a public API. Keep
+  every field optional and fall back to showing only the model name. The field names were read from the
+  binary, not from a live payload, so confirm them in a real session before relying on them.
 - **zsh's `echo` interprets `\n`**; when building test fixtures use `printf '%s\n'`.
 - **`lsappinfo info -only name` prints `"iTerm2" ASN:...`**, not `LSDisplayName=`. Parse the first quoted string.
 - **`claude -w` refuses untrusted folders** ("Workspace trust not yet accepted"). `cw` checks

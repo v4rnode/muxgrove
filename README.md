@@ -20,6 +20,7 @@ New here? Read [TUTORIAL.md](TUTORIAL.md) (about 15 minutes, hands on).
 | iTerm2 | Both Option keys set to Esc+ (needed for word jumps and tmux Alt keys). |
 | tmux | Config with fuzzy session and window switchers, Alt shortcuts, popup shell, copy mode, a colored status bar, and tmux-resurrect + continuum for restore after a restart. |
 | `cw` | One command to start a task: picks a Claude profile, creates a tmux session, runs `claude -w <name>` (Claude makes the git worktree). Also `cw -r` to reopen a past conversation, `cw -d` to clean up, `cw doctor` to check the setup. |
+| Usage | Claude's status line and the tmux bar show the 5-hour and weekly usage (green, yellow from 50%, red from 80%) with reset times. |
 | Alerts | Status bar markers for other sessions (`⚠` needs you, `✔` finished), a sound and a macOS notification when iTerm2 is in the background (click the notification to jump to that session), and a session picker with a live preview. |
 | Slash commands | `/ticket` reads a Jira ticket and proposes a plan; `/pr` reviews the branch and opens a draft PR; `/pr-comments` works through review feedback. All ask before changing or pushing anything. |
 
@@ -29,6 +30,7 @@ New here? Read [TUTORIAL.md](TUTORIAL.md) (about 15 minutes, hands on).
 cd ~/Projects/some-repo
 cw login-fix              # pick a profile (arrows + enter), start Claude in a worktree
 cw -p work login-fix       # skip the picker
+cw --no-rc login-fix      # same, without Remote Control (it is on by default)
 cw -r                     # reopen a past Claude conversation from this repo (pick from a list)
 cw -d login-fix           # close the session, offer to remove its worktree and branch
 cw doctor                 # check the whole setup, with a fix for anything wrong
@@ -114,10 +116,22 @@ CW_SOUND=0              # mute the sound alert
 CW_SOUND_DONE=Glass     # sound when Claude finishes (any name in /System/Library/Sounds)
 CW_SOUND_INPUT=Funk     # sound when Claude needs you
 CW_NO_NOTIFY=1          # no macOS notifications
+CW_REMOTE_CONTROL=0     # Remote Control is on by default; 0 turns it off (cw -R forces it on for one session)
 ```
 
 The sound needs no macOS permission, so it works on any Mac right after `setup.sh`. It plays only when
 iTerm2 is not the frontmost app, the same rule as notifications.
+
+## Remote Control and usage
+
+Every `cw` session starts Claude with `--remote-control <name>`, so it shows up in the Claude app and on the
+web under the same name as the tmux session (also for `cw -r`). The tmux status bar shows a blue `RC` tag.
+Turn it off for one session with `cw --no-rc <name>`, or for good with `CW_REMOTE_CONTROL=0`.
+
+Usage: `setup.sh` installs `~/.config/tmux/cc-statusline.sh` as each profile's Claude status line (only if the
+profile has none of its own). It prints the model plus `5h` and `week` usage with reset times, and caches the
+numbers per profile so the tmux status bar can show `5h 34% wk 61%` too. A number whose window has already
+reset shows as `-` until Claude reports again. Only subscription logins report these limits.
 
 ## The one manual step
 
@@ -153,6 +167,7 @@ terminal; `NO_COLOR=1` turns them off. The exit status is 1 if anything is unhea
 | No notifications | System Settings > Notifications, allow "terminal-notifier". Silence on purpose with `CW_NO_NOTIFY=1`. |
 | `terminal-notifier` is not in System Settings > Notifications | macOS lists an app only after it has asked once. Run `terminal-notifier -title test -message hi` in a normal iTerm2 tab (not from inside Claude or another app) and click Allow. `terminal-notifier -diagnose` explains the current state. |
 | Clicking a notification does nothing | It focuses iTerm2 and switches tmux to that session. That needs a tmux client attached; if you detached, only iTerm2 is focused. |
+| No usage numbers | Needs a subscription login and at least one message sent in a session started after `setup.sh`. A profile with its own status line is left alone; `cw doctor` says so. |
 | Alert markers never appear | The session must have been started after the hooks were installed. Restart Claude in it. |
 
 ## Development

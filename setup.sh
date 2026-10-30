@@ -188,10 +188,10 @@ set-hook -g client-attached        'run-shell -b "rm -f ~/.cache/cw/alerts/#{q:s
 set -g status-position bottom
 set -g status-style "bg=colour236,fg=colour250"
 set -g status-left-length 80
-set -g status-left "#[bg=colour39,fg=colour16,bold] #S #[default]#[fg=colour245] #{@account} "
+set -g status-left "#[bg=colour39,fg=colour16,bold] #S #[default]#[fg=colour245] #{@account}#{?@rc,#[fg=colour39] RC#[fg=colour245],} "
 set -g status-interval 2
 set -g status-right-length 140
-set -g status-right "#(~/.config/tmux/status.sh '#{session_name}' '#{pane_current_path}')#[fg=colour245]%H:%M "
+set -g status-right "#(~/.config/tmux/status.sh '#{session_name}' '#{pane_current_path}' '#{@cfgdir}')#[fg=colour245]%H:%M "
 setw -g window-status-separator ""
 setw -g window-status-format "#[fg=colour245] #I:#W "
 setw -g window-status-current-format "#[bg=colour208,fg=colour16,bold] #I:#W "
@@ -216,7 +216,7 @@ for repo in tpm tmux-resurrect tmux-continuum; do
 done
 
 # 3. Claude alert hook, status bar helper and session picker
-rm -f ~/.config/tmux/cc-bell.sh ~/.config/tmux/status.sh ~/.config/tmux/session-picker.sh
+rm -f ~/.config/tmux/cc-bell.sh ~/.config/tmux/status.sh ~/.config/tmux/session-picker.sh ~/.config/tmux/cc-statusline.sh
 cat > ~/.config/tmux/cc-bell.sh <<'CC_BELL_EOF'
 #!/bin/sh
 # Claude Code hook (Stop, Notification, PermissionRequest, UserPromptSubmit, SessionEnd).
@@ -294,9 +294,9 @@ exit 0
 CC_BELL_EOF
 cat > ~/.config/tmux/status.sh <<'STATUS_EOF'
 #!/bin/sh
-# tmux status-right helper. Usage: status.sh <current_session> <pane_path>
-# Shows other sessions that are done/need you, then the git branch of the active pane.
-cur="$1"; path="$2"
+# tmux status-right helper. Usage: status.sh <current_session> <pane_path> <profile_config_dir>
+# Shows other sessions that are done/need you, the profile's usage, then the git branch of the pane.
+cur="$1"; path="$2"; cfg="$3"
 dir="$HOME/.cache/cw/alerts"
 out=""
 if [ -d "$dir" ]; then
@@ -312,6 +312,19 @@ if [ -d "$dir" ]; then
     esac
   done
 fi
+# Usage numbers written by cc-statusline.sh; a number whose window has already reset is shown as -
+u="$HOME/.cache/cw/usage/$(printf '%s' "${cfg:-default}" | tr -c 'A-Za-z0-9._-' '_')"
+if [ -f "$u" ] && IFS='|' read -r p5 r5 pw rw < "$u"; then
+  now=$(date +%s)
+  seg() {
+    [ -n "$2" ] || return 0
+    if [ -n "$3" ] && [ "$now" -ge "$3" ]; then out="$out#[fg=colour245]$1 - "; return 0; fi
+    if [ "$2" -ge 80 ]; then c=196; elif [ "$2" -ge 50 ]; then c=178; else c=34; fi
+    out="$out#[fg=colour$c]$1 $2%#[default] "
+  }
+  seg 5h "$p5" "$r5"
+  seg wk "$pw" "$rw"
+fi
 if [ -n "$path" ] && b=$(git -C "$path" symbolic-ref --short -q HEAD 2>/dev/null || git -C "$path" rev-parse --short HEAD 2>/dev/null); then
   d=""
   [ -n "$(git -C "$path" status --porcelain -uno 2>/dev/null | head -n 1)" ] && d="*"
@@ -320,6 +333,40 @@ if [ -n "$path" ] && b=$(git -C "$path" symbolic-ref --short -q HEAD 2>/dev/null
 fi
 printf '%s' "$out"
 STATUS_EOF
+cat > ~/.config/tmux/cc-statusline.sh <<'STATUSLINE_EOF'
+#!/bin/sh
+# Claude Code status line: model, then 5-hour and weekly usage with reset times.
+# Also caches the numbers per profile (~/.cache/cw/usage/<key>) for the tmux status bar.
+# The rate_limits shape is Claude's own, not a public API, so every field is optional.
+input=$(cat)
+row=$(printf '%s' "$input" | jq -r '
+  def ts: if type == "number" then . elif type == "string" then (sub("\\.[0-9]+"; "") | try fromdateiso8601 catch null) else null end;
+  def pct(w): (.rate_limits[w].used_percentage | if type == "number" then round else "" end);
+  def rst(w): ((.rate_limits[w].resets_at | ts) // "");
+  [(.model.display_name // ""), pct("five_hour"), rst("five_hour"), pct("seven_day"), rst("seven_day")]
+  | map(tostring) | join("|")' 2>/dev/null)
+IFS='|' read -r model p5 r5 pw rw <<EOF
+$row
+EOF
+color() { if [ "$1" -ge 80 ]; then printf '\033[31m'; elif [ "$1" -ge 50 ]; then printf '\033[33m'; else printf '\033[32m'; fi; }
+# seg <label> <pct> <reset epoch> <date format>
+seg() {
+  [ -n "$2" ] || return 0
+  out="$out · $(color "$2")$1 $2%$(printf '\033[0m')"
+  [ -n "$3" ] && out="$out (resets $(date -r "$3" "+$4" 2>/dev/null))"
+}
+out="${model:-Claude}"
+seg 5h "$p5" "$r5" %H:%M
+seg week "$pw" "$rw" %a
+printf '%s\n' "$out"
+if [ -n "$p5$pw" ]; then
+  key=$(printf '%s' "${CLAUDE_CONFIG_DIR:-default}" | tr -c 'A-Za-z0-9._-' '_')
+  mkdir -p "$HOME/.cache/cw/usage"
+  f="$HOME/.cache/cw/usage/$key"
+  # Several sessions of one profile write here, so replace the file atomically
+  printf '%s|%s|%s|%s\n' "$p5" "$r5" "$pw" "$rw" > "$f.$$" && mv "$f.$$" "$f"
+fi
+STATUSLINE_EOF
 cat > ~/.config/tmux/session-picker.sh <<'PICKER_EOF'
 #!/bin/sh
 # Fuzzy session picker with live preview. Usage: session-picker.sh <client_name>
@@ -342,7 +389,7 @@ sel=$(tmux list-sessions -F '#{session_name}|#{@account}' | while IFS='|' read -
 [ -n "$sel" ] && tmux switch-client -c "$client" -t "=$sel"
 exit 0
 PICKER_EOF
-chmod +x ~/.config/tmux/cc-bell.sh ~/.config/tmux/status.sh ~/.config/tmux/session-picker.sh
+chmod +x ~/.config/tmux/cc-bell.sh ~/.config/tmux/status.sh ~/.config/tmux/session-picker.sh ~/.config/tmux/cc-statusline.sh
 
 # 4. cw helper (new tmux session running claude in its own git worktree)
 rm -f ~/.local/bin/cw
@@ -352,6 +399,8 @@ cat > ~/.local/bin/cw <<'CW_EOF'
 # cw -d [session]                close a session and offer to remove its worktree
 # cw -r [-p <profile>]           reopen a past Claude conversation from this repo
 # cw doctor                      check the whole setup and say how to fix problems
+# cw --no-rc <name>              start without Remote Control (it is on by default; -R forces it on
+#                                when CW_REMOTE_CONTROL=0 in ~/.config/cw/config turned it off)
 # Start Claude in an isolated git worktree (claude -w <name>) inside its own
 # tmux session. Run from inside a git repo.
 #   cw login-fix             pick a profile with up/down + enter
@@ -360,7 +409,9 @@ cat > ~/.local/bin/cw <<'CW_EOF'
 # (empty config_dir = Claude's default login). If the session already exists,
 # cw just switches to it.
 PROFILES="${CW_PROFILES:-$HOME/.config/cw/profiles}"
-usage() { echo "usage: cw [-p <profile>] <name> | cw -r [-p <profile>] | cw -d [session] | cw doctor"; exit 1; }
+usage() { echo "usage: cw [--no-rc] [-p <profile>] <name> | cw [--no-rc] -r [-p <profile>] | cw -d [session] | cw doctor"; exit 1; }
+[ -f "$HOME/.config/cw/config" ] && . "$HOME/.config/cw/config"
+remote=1; [ "${CW_REMOTE_CONTROL:-1}" = 0 ] && remote=
 
 [ "$1" = doctor ] && [ $# -eq 1 ] && exec "$(dirname "$0")/cw-doctor"
 
@@ -405,6 +456,8 @@ while [ $# -gt 0 ]; do
   case "$1" in
     -p) [ -n "$2" ] || usage; profile="$2"; shift 2 ;;
     -r) resume=1; shift ;;
+    -R) remote=1; shift ;;
+    --no-rc) remote=; shift ;;
     *) break ;;
   esac
 done
@@ -494,7 +547,7 @@ resume_flow() {
   [ "$profile" = "default" ] || sess="$sess-$(printf '%s' "$profile" | tr './: ' '----')"
   if ! tmux has-session -t "=$sess" 2>/dev/null; then
     RWRAP='
-claude --resume "$1"
+if [ -n "$2" ]; then claude --resume "$1" --remote-control "$2"; else claude --resume "$1"; fi
 rc=$?
 if [ "$rc" -ne 0 ]; then
   echo
@@ -502,7 +555,7 @@ if [ "$rc" -ne 0 ]; then
   read -r _
 fi
 exit "$rc"'
-    set -- sh -c "$RWRAP" _ "$sid"
+    set -- sh -c "$RWRAP" _ "$sid" "${remote:+$sess}"
     if [ -n "$dir" ]; then
       tmux new-session -d -s "$sess" -n "$profile" -c "$cwd" -e "CLAUDE_CONFIG_DIR=$dir" "$@"
     else
@@ -510,6 +563,8 @@ exit "$rc"'
     fi
     tmux set-option -t "=$sess:" @account "$profile: $(profile_email "$profile")"
     tmux set-option -t "=$sess:" @profile "$profile"
+    tmux set-option -t "=$sess:" @cfgdir "$dir"
+    [ -n "$remote" ] && tmux set-option -t "=$sess:" @rc 1
     rm -f "$HOME/.cache/cw/alerts/$sess"
   fi
   if [ -n "$TMUX" ]; then tmux switch-client -t "=$sess"; else tmux attach -t "=$sess"; fi
@@ -534,7 +589,7 @@ if [ "$2" = no ]; then
   claude
   clear
 fi
-claude -w "$1"
+if [ -n "$3" ]; then claude -w "$1" --remote-control "$3"; else claude -w "$1"; fi
 rc=$?
 if [ "$rc" -ne 0 ]; then
   echo
@@ -542,7 +597,7 @@ if [ "$rc" -ne 0 ]; then
   read -r _
 fi
 exit "$rc"'
-  set -- sh -c "$WRAP" _ "$name" "$trusted"
+  set -- sh -c "$WRAP" _ "$name" "$trusted" "${remote:+$sess}"
   if [ -n "$dir" ]; then
     tmux new-session -d -s "$sess" -n "$profile" -c "$PWD" -e "CLAUDE_CONFIG_DIR=$dir" "$@"
   else
@@ -551,6 +606,8 @@ exit "$rc"'
   # Shown in the tmux status bar (see status-left in ~/.tmux.conf)
   tmux set-option -t "=$sess:" @account "$profile: $(profile_email "$profile")"
   tmux set-option -t "=$sess:" @profile "$profile"
+  tmux set-option -t "=$sess:" @cfgdir "$dir"
+  [ -n "$remote" ] && tmux set-option -t "=$sess:" @rc 1
   rm -f "$HOME/.cache/cw/alerts/$sess"
 fi
 
@@ -609,7 +666,7 @@ else bad "managed block appears $n times in ~/.zshrc" "delete the duplicates, th
 
 section "tmux"
 [ -f "$HOME/.tmux.conf" ] && ok "~/.tmux.conf" || bad "~/.tmux.conf missing" "$SETUP"
-for f in cc-bell.sh status.sh session-picker.sh; do
+for f in cc-bell.sh status.sh session-picker.sh cc-statusline.sh; do
   if [ -x "$HOME/.config/tmux/$f" ]; then ok "$f"; else bad "~/.config/tmux/$f missing or not executable" "$SETUP"; fi
 done
 for p in tpm tmux-resurrect tmux-continuum; do
@@ -643,6 +700,10 @@ else
       jq -e --arg e "$e" --arg c "$HOME/.config/tmux/cc-bell.sh" '[.hooks[$e][]?.hooks[]?.command] | index($c)' "$cfg/settings.json" >/dev/null 2>&1 || missing="$missing $e"
     done
     if [ -z "$missing" ]; then ok "alert hook registered for all 5 events"; else bad "alert hook missing for:$missing" "$SETUP"; fi
+    sl=$(jq -r '.statusLine.command // empty' "$cfg/settings.json" 2>/dev/null)
+    if [ "$sl" = "$HOME/.config/tmux/cc-statusline.sh" ]; then ok "usage status line installed"
+    elif [ -n "$sl" ]; then note "this profile has its own status line, so usage shows in Claude only if it does (and in tmux not at all)"
+    else warn "usage status line not installed" "$SETUP"; fi
     if grep -q 'cc-status' "$cfg/settings.json" 2>/dev/null; then
       note "iTerm2's own Claude Code integration is installed here and posts its own notification."
       echo "            To keep only muxgrove's: iTerm2 menu > Uninstall Claude Code Integration."
@@ -862,7 +923,10 @@ grep -v '^[[:space:]]*\(#\|$\)' ~/.config/cw/profiles | cut -d= -f2- | while rea
     reduce ("Notification","PermissionRequest","Stop","UserPromptSubmit","SessionEnd") as $e (.;
       if ([.hooks[$e][]?.hooks[]?.command] | index($cmd))
       then . else .hooks[$e] += [{"hooks":[{"type":"command","command":$cmd}]}] end)
-  ' "$S.bak" > "$S"
+  ' "$S.bak" | jq --arg sl "$HOME/.config/tmux/cc-statusline.sh" '
+    # usage status line, unless the profile already has its own
+    if .statusLine then . else .statusLine = {"type":"command","command":$sl} end
+  ' > "$S"
 done
 
 # 7. Reload if tmux is running

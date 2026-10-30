@@ -78,6 +78,12 @@ Skip the picker with `cw -p work hello` (use any profile name from `~/.config/cw
    preview of what each Claude is showing. Press Enter to jump. Switching clears that marker.
 5. Faster: `Alt+j` and `Alt+k` cycle sessions, `Ctrl+b` then `Tab` jumps back to the last one.
 
+Two extras while you are here:
+- Every session has Remote Control on. It appears in the Claude app under the session's name, and the
+  status bar shows a blue `RC` (`cw --no-rc three` skips it).
+- After your first message in a session, the status bar shows your usage, for example `5h 34% wk 61%`
+  (green, yellow from 50%, red from 80%).
+
 ## 5. Hand Claude a Jira ticket (1 minute)
 
 Inside any Claude session in a real repo:
