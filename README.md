@@ -20,7 +20,7 @@ New here? Read [TUTORIAL.md](TUTORIAL.md) (about 15 minutes, hands on).
 | iTerm2 | Both Option keys set to Esc+ (needed for word jumps and tmux Alt keys). |
 | tmux | Config with fuzzy session and window switchers, Alt shortcuts, popup shell, copy mode, a colored status bar, and tmux-resurrect + continuum for restore after a restart. |
 | `cw` | One command to start a task: picks a Claude profile, creates a tmux session, runs `claude -w <name>` (Claude makes the git worktree). Also `cw -r` to reopen a past conversation, `cw -d` to clean up, `cw doctor` to check the setup. |
-| Usage | Claude's status line and the tmux bar show the 5-hour and weekly usage (green, yellow from 50%, red from 80%) with reset times. |
+| Usage | Claude's status line and the tmux bar show how much of the 5-hour and weekly usage limits you have used, with reset times (green, yellow from 50%, red from 80%). See "Remote Control and usage". |
 | Alerts | Status bar markers for other sessions (`⚠` needs you, `✔` finished), a sound and a macOS notification when iTerm2 is in the background (click the notification to jump to that session), and a session picker with a live preview. |
 | Slash commands | `/ticket` reads a Jira ticket and proposes a plan; `/pr` reviews the branch and opens a draft PR; `/pr-comments` works through review feedback. All ask before changing or pushing anything. |
 
@@ -129,9 +129,23 @@ web under the same name as the tmux session (also for `cw -r`). The tmux status 
 Turn it off for one session with `cw --no-rc <name>`, or for good with `CW_REMOTE_CONTROL=0`.
 
 Usage: `setup.sh` installs `~/.config/tmux/cc-statusline.sh` as each profile's Claude status line (only if the
-profile has none of its own). It prints the model plus `5h` and `week` usage with reset times, and caches the
-numbers per profile so the tmux status bar can show `5h 34% wk 61%` too. A number whose window has already
-reset shows as `-` until Claude reports again. Only subscription logins report these limits.
+profile has none of its own). It prints the model plus `5h` and `wk` usage with reset times, and caches the
+numbers per profile so the tmux status bar shows the same line without the model name.
+Only subscription logins report these limits.
+
+```
+5h 34% ↻16:00 · wk 61% ↻Tue
+```
+
+| Shown | Meaning |
+|---|---|
+| `5h 34%` | Share of the rolling 5-hour usage limit already used. |
+| `wk 61%` | Share of the 7-day usage limit already used. |
+| `↻16:00`, `↻Tue` | When that window resets (a time for 5h, a weekday for wk). |
+| Green, yellow, red | Under 50%, 50 to 79%, 80% or more. |
+| `5h -` | That window has already reset and Claude has not reported a new value yet. |
+
+Each profile has its own limits; the tmux bar shows the ones for the current session's profile.
 
 ## The one manual step
 

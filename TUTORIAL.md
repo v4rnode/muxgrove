@@ -81,7 +81,7 @@ Skip the picker with `cw -p work hello` (use any profile name from `~/.config/cw
 Two extras while you are here:
 - Every session has Remote Control on. It appears in the Claude app under the session's name, and the
   status bar shows a blue `RC` (`cw --no-rc three` skips it).
-- After your first message in a session, the status bar shows your usage, for example `5h 34% wk 61%`
+- After your first message in a session, the status bar shows your usage, for example `5h 34% ↻16:00 · wk 61% ↻Tue`
   (green, yellow from 50%, red from 80%).
 
 ## 5. Hand Claude a Jira ticket (1 minute)

@@ -320,10 +320,11 @@ if [ -f "$u" ] && IFS='|' read -r p5 r5 pw rw < "$u"; then
     [ -n "$2" ] || return 0
     if [ -n "$3" ] && [ "$now" -ge "$3" ]; then out="$out#[fg=colour245]$1 - "; return 0; fi
     if [ "$2" -ge 80 ]; then c=196; elif [ "$2" -ge 50 ]; then c=178; else c=34; fi
-    out="$out#[fg=colour$c]$1 $2%#[default] "
+    t=""; [ -n "$3" ] && t=" ↻$(date -r "$3" "+$4" 2>/dev/null)"
+    out="$out#[fg=colour$c]$1 $2%$t#[default] "
   }
-  seg 5h "$p5" "$r5"
-  seg wk "$pw" "$rw"
+  seg 5h "$p5" "$r5" %H:%M
+  seg wk "$pw" "$rw" %a
 fi
 if [ -n "$path" ] && b=$(git -C "$path" symbolic-ref --short -q HEAD 2>/dev/null || git -C "$path" rev-parse --short HEAD 2>/dev/null); then
   d=""
@@ -353,11 +354,11 @@ color() { if [ "$1" -ge 80 ]; then printf '\033[31m'; elif [ "$1" -ge 50 ]; then
 seg() {
   [ -n "$2" ] || return 0
   out="$out · $(color "$2")$1 $2%$(printf '\033[0m')"
-  [ -n "$3" ] && out="$out (resets $(date -r "$3" "+$4" 2>/dev/null))"
+  [ -n "$3" ] && out="$out ↻$(date -r "$3" "+$4" 2>/dev/null)"
 }
 out="${model:-Claude}"
 seg 5h "$p5" "$r5" %H:%M
-seg week "$pw" "$rw" %a
+seg wk "$pw" "$rw" %a
 printf '%s\n' "$out"
 if [ -n "$p5$pw" ]; then
   key=$(printf '%s' "${CLAUDE_CONFIG_DIR:-default}" | tr -c 'A-Za-z0-9._-' '_')
