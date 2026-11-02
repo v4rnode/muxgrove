@@ -336,8 +336,8 @@ printf '%s' "$out"
 STATUS_EOF
 cat > ~/.config/tmux/cc-statusline.sh <<'STATUSLINE_EOF'
 #!/bin/sh
-# Claude Code status line: model, then 5-hour and weekly usage with reset times.
-# Also caches the numbers per profile (~/.cache/cw/usage/<key>) for the tmux status bar.
+# Claude Code status line: just the model name. Usage is not shown here, it lives in the tmux bar.
+# Caches the 5-hour and weekly numbers per profile (~/.cache/cw/usage/<key>) for the tmux status bar.
 # The rate_limits shape is Claude's own, not a public API, so every field is optional.
 input=$(cat)
 row=$(printf '%s' "$input" | jq -r '
@@ -349,16 +349,7 @@ row=$(printf '%s' "$input" | jq -r '
 IFS='|' read -r model p5 r5 pw rw <<EOF
 $row
 EOF
-color() { if [ "$1" -ge 80 ]; then printf '\033[31m'; elif [ "$1" -ge 50 ]; then printf '\033[33m'; else printf '\033[32m'; fi; }
-# seg <label> <pct> <reset epoch> <date format>
-seg() {
-  [ -n "$2" ] || return 0
-  out="$out · $(color "$2")$1 $2%$(printf '\033[0m')"
-  [ -n "$3" ] && out="$out ↻$(date -r "$3" "+$4" 2>/dev/null)"
-}
 out="${model:-Claude}"
-seg 5h "$p5" "$r5" %H:%M
-seg wk "$pw" "$rw" %a
 printf '%s\n' "$out"
 if [ -n "$p5$pw" ]; then
   key=$(printf '%s' "${CLAUDE_CONFIG_DIR:-default}" | tr -c 'A-Za-z0-9._-' '_')
