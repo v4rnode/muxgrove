@@ -154,6 +154,9 @@ Use `cw` (a worktree per session) when:
 - a task is a branch you will review or merge separately,
 - you want to throw the work away without touching your main checkout.
 
+`cw` also works in a folder that is not a git repo. It then skips the worktree and just runs `claude` there
+in its own tmux session.
+
 Plain `claude` in the main folder is fine when:
 - you only ask questions or read code,
 - it is the only session in that repo,

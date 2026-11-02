@@ -22,7 +22,7 @@
 #   prefix f  also shows warning/check markers for sessions that need you / are done
 #   Alt+h / Alt+l  prev/next window, Alt+j / Alt+k  next/prev session
 #   prefix d  detach (tmux attach -t NAME to return)
-# Workflow: run `cw <name>` inside a git repo -> pick a profile (arrows + enter) ->
+# Workflow: run `cw <name>` (in a git repo; elsewhere it runs plain claude, no worktree) -> pick a profile (arrows + enter) ->
 #   new tmux session running `claude -w <name>` with that profile's login.
 #   Skip the picker: `cw -p work <name>`. Profiles: ~/.config/cw/profiles
 #   Claude makes the worktree at .claude/worktrees/<name>, branch worktree-<name>.
@@ -403,7 +403,8 @@ cat > ~/.local/bin/cw <<'CW_EOF'
 # cw --no-rc <name>              start without Remote Control (it is on by default; -R forces it on
 #                                when CW_REMOTE_CONTROL=0 in ~/.config/cw/config turned it off)
 # Start Claude in an isolated git worktree (claude -w <name>) inside its own
-# tmux session. Run from inside a git repo.
+# tmux session. Outside a git repo it starts plain claude in the current folder
+# (no worktree, no isolation).
 #   cw login-fix             pick a profile with up/down + enter
 #   cw -p work login-fix      skip the picker
 # Profiles live in ~/.config/cw/profiles, one `name=config_dir` per line
@@ -463,7 +464,8 @@ while [ $# -gt 0 ]; do
   esac
 done
 [ -n "$resume" ] || [ -n "$1" ] || usage
-git rev-parse --show-toplevel >/dev/null 2>&1 || { echo "cw: not in a git repo"; exit 1; }
+# Outside a git repo there is no worktree to make: run plain `claude` in the folder instead.
+git=1; git rev-parse --show-toplevel >/dev/null 2>&1 || git=
 name="${1:-resume}"
 
 # Signed-in email for a profile (read from its .claude.json)
@@ -509,8 +511,11 @@ is_trusted() {
 # Reads the profile's session files (~/.claude/projects/*/<id>.jsonl) and resumes the chosen one
 # in the folder it ran in, as its own tmux session.
 resume_flow() {
-  gc=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)
-  root=${gc%/.git}
+  root=$PWD
+  if [ -n "$git" ]; then
+    gc=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)
+    root=${gc%/.git}
+  fi
   # Claude may have recorded the folder by a symlinked path (for example /tmp vs /private/tmp),
   # so also match the path as typed in this shell, minus any worktree suffix.
   root2=${PWD%%/.claude/worktrees/*}
@@ -578,7 +583,8 @@ sess=$(printf '%s' "$name" | tr './: ' '----')
 
 if ! tmux has-session -t "=$sess" 2>/dev/null; then
   trusted=yes
-  is_trusted "$dir" || trusted=no
+  # Plain `claude` shows its own trust dialog, so only the worktree path needs the pre-check.
+  [ -z "$git" ] || is_trusted "$dir" || trusted=no
   # Runs inside the new session. Untrusted folder: let Claude show its trust dialog
   # first. A failing Claude keeps the pane open so the error stays readable.
   WRAP='
@@ -590,7 +596,11 @@ if [ "$2" = no ]; then
   claude
   clear
 fi
-if [ -n "$3" ]; then claude -w "$1" --remote-control "$3"; else claude -w "$1"; fi
+if [ -n "$4" ]; then
+  if [ -n "$3" ]; then claude -w "$1" --remote-control "$3"; else claude -w "$1"; fi
+else
+  if [ -n "$3" ]; then claude --remote-control "$3"; else claude; fi
+fi
 rc=$?
 if [ "$rc" -ne 0 ]; then
   echo
@@ -598,7 +608,7 @@ if [ "$rc" -ne 0 ]; then
   read -r _
 fi
 exit "$rc"'
-  set -- sh -c "$WRAP" _ "$name" "$trusted" "${remote:+$sess}"
+  set -- sh -c "$WRAP" _ "$name" "$trusted" "${remote:+$sess}" "$git"
   if [ -n "$dir" ]; then
     tmux new-session -d -s "$sess" -n "$profile" -c "$PWD" -e "CLAUDE_CONFIG_DIR=$dir" "$@"
   else

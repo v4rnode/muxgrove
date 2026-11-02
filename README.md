@@ -50,6 +50,9 @@ The flow is: `cw` a task, `/ticket` to plan, implement, `/pr` to open it, `/pr-c
 first, with the first prompt as a hint) for the profile you pick, and resumes the one you choose in the
 folder it ran in. Conversations whose worktree no longer exists are skipped.
 
+Outside a git repo `cw <name>` still works: it opens the tmux session and runs plain `claude` in the current
+folder, with no worktree and no isolation. `cw -r` then lists conversations from that folder only.
+
 ### Keys (tmux prefix is `Ctrl+b`)
 
 | Key | Action |
