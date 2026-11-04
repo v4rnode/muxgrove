@@ -40,7 +40,7 @@
 #   PR flow inside Claude: /pr (review + draft PR, asks before pushing), /pr-comments (review feedback).
 #   Sound alerts (no permissions needed): preferences in ~/.config/cw/config (CW_SOUND=0 to mute).
 #   Status bar: warning = needs you, check = finished, in other sessions; shows the git branch.
-#   After a reboot continuum restores layouts and folders; run `claude --resume` in the pane.
+#   After a reboot nothing is restored on its own; press Ctrl+b Ctrl+r to bring back saved layouts and folders.
 set -e
 SETUP_DIR="$(cd "$(dirname "$0")" && pwd)"
 
@@ -197,13 +197,15 @@ setw -g window-status-format "#[fg=colour245] #I:#W "
 setw -g window-status-current-format "#[bg=colour208,fg=colour16,bold] #I:#W "
 setw -g window-status-bell-style "bg=colour196,fg=colour231,bold"
 
-# Persistence across reboots: tmux-resurrect + continuum via TPM (layouts and folders come back;
+# Persistence: tmux-resurrect + continuum via TPM save layouts; restore is manual (layouts and folders come back;
 # Claude itself is not restarted, run `claude --resume` in the pane). Keep this block LAST.
 # Skipped when CW_NO_PLUGINS is set (used for isolated test servers).
 set -g @plugin 'tmux-plugins/tpm'
 set -g @plugin 'tmux-plugins/tmux-resurrect'
 set -g @plugin 'tmux-plugins/tmux-continuum'
-set -g @continuum-restore 'on'
+# No auto-restore: it ran when cw started the server and could overwrite the new session.
+# Restore on demand with prefix + Ctrl-r.
+set -g @continuum-restore 'off'
 set -g @continuum-save-interval '10'
 set -g @resurrect-capture-pane-contents 'on'
 if-shell '[ -z "$CW_NO_PLUGINS" ] && [ -x ~/.tmux/plugins/tpm/tpm ]' "run '~/.tmux/plugins/tpm/tpm'"

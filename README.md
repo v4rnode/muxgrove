@@ -18,7 +18,7 @@ New here? Read [TUTORIAL.md](TUTORIAL.md) (about 15 minutes, hands on).
 | Tools | Homebrew, Oh My Zsh (+ autosuggestions and two syntax highlighters), `tmux`, `fzf`, `jq`, `git`, `gh`, `node`, `fnm`, `terminal-notifier`, `rustup`, iTerm2, Claude Code CLI. Only what is missing is installed. |
 | Shell | A managed block at the end of `~/.zshrc`: PATH, fzf, fnm, Option+Left/Right word jumps, and a `claude-<profile>` command per profile. |
 | iTerm2 | Both Option keys set to Esc+ (needed for word jumps and tmux Alt keys). |
-| tmux | Config with fuzzy session and window switchers, Alt shortcuts, popup shell, copy mode, a colored status bar, and tmux-resurrect + continuum for restore after a restart. |
+| tmux | Config with fuzzy session and window switchers, Alt shortcuts, popup shell, copy mode, a colored status bar, and tmux-resurrect + continuum for saved layouts (restored only on demand with Ctrl+b Ctrl+r, never automatically). |
 | `cw` | One command to start a task: picks a Claude profile, creates a tmux session, runs `claude -w <name>` (Claude makes the git worktree). Also `cw -r` to reopen a past conversation, `cw -d` to clean up, `cw doctor` to check the setup. |
 | Usage | Claude's status line and the tmux bar show how much of the 5-hour and weekly usage limits you have used, with reset times (green, yellow from 50%, red from 80%). See "Remote Control and usage". |
 | Alerts | Status bar markers for other sessions (`⚠` needs you, `✔` finished), a sound and a macOS notification when iTerm2 is in the background (click the notification to jump to that session), and a session picker with a live preview. |
